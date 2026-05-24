@@ -1,7 +1,6 @@
 import AppKit
 
 /// Three traffic lights inside a white-bordered transparent pill.
-/// Running state shows marquee between yellow and green only.
 final class PillStatusView: NSView {
     private var currentState: AgentState = .idle
     private var animTimer: Timer?
@@ -32,7 +31,7 @@ final class PillStatusView: NSView {
         stopAnim()
         switch state {
         case .thinking, .developing:
-            startAnim()
+            startMarquee()
         case .confirming:
             startBlink()
         default:
@@ -51,7 +50,6 @@ final class PillStatusView: NSView {
         let spacing: CGFloat = 13
         let startX = (pillWidth - spacing * 2) / 2
 
-        // Capsule shape
         let pillRect = NSRect(x: 0, y: 0, width: pillWidth, height: pillHeight)
         let pillPath = NSBezierPath(roundedRect: pillRect, xRadius: pillHeight / 2, yRadius: pillHeight / 2)
         NSColor.clear.setFill()
@@ -62,17 +60,14 @@ final class PillStatusView: NSView {
 
         let (ya, ga, ra) = lightAlphas()
 
-        // Yellow (left)
         ctx.setFillColor(yellowColor.withAlphaComponent(ya).cgColor)
         ctx.fillEllipse(in: NSRect(x: startX - dotRadius, y: centerY - dotRadius,
                                    width: dotRadius * 2, height: dotRadius * 2))
 
-        // Green (center)
         ctx.setFillColor(greenColor.withAlphaComponent(ga).cgColor)
         ctx.fillEllipse(in: NSRect(x: startX + spacing - dotRadius, y: centerY - dotRadius,
                                    width: dotRadius * 2, height: dotRadius * 2))
 
-        // Red (right)
         ctx.setFillColor(redColor.withAlphaComponent(ra).cgColor)
         ctx.fillEllipse(in: NSRect(x: startX + spacing * 2 - dotRadius, y: centerY - dotRadius,
                                    width: dotRadius * 2, height: dotRadius * 2))
@@ -85,41 +80,37 @@ final class PillStatusView: NSView {
         switch currentState {
         case .idle:
             return (dim, dim, dim)
-
         case .thinking, .developing:
-            // Marquee between yellow and green only
-            // phase 0..1: yellow bright, green dim
-            // phase 1..2: yellow dim, green bright
             let p = animPhase.truncatingRemainder(dividingBy: 2.0)
             let yAlpha: CGFloat = (p < 1.0) ? 1.0 : dim
             let gAlpha: CGFloat = (p >= 1.0) ? 1.0 : dim
             return (yAlpha, gAlpha, dim)
-
         case .confirming:
-            // Red blink
             let r = isBlinkVisible ? 1.0 : 0.08
             return (dim, dim, r)
-
         case .completed:
-            // Green solid
             return (dim, 1.0, dim)
         }
     }
 
-    private func startAnim() {
-        animTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 15.0, repeats: true) { [weak self] _ in
+    private func startMarquee() {
+        let timer = Timer(timeInterval: 1.0 / 15.0, repeats: true) { [weak self] _ in
             guard let self else { return }
             self.animPhase += 0.10
             self.needsDisplay = true
         }
+        RunLoop.main.add(timer, forMode: .common)
+        animTimer = timer
     }
 
     private func startBlink() {
-        animTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+        let timer = Timer(timeInterval: 0.5, repeats: true) { [weak self] _ in
             guard let self else { return }
             self.isBlinkVisible.toggle()
             self.needsDisplay = true
         }
+        RunLoop.main.add(timer, forMode: .common)
+        animTimer = timer
     }
 
     private func stopAnim() {
