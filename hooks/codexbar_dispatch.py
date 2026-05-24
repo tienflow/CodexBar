@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from __future__ import annotations
 """CodexBar hook dispatcher.
 
 Reads Codex hook JSON from stdin, maps events to agent states,
@@ -12,6 +13,7 @@ import fcntl
 from datetime import datetime, timezone, timedelta
 
 STATUS_PATH = os.path.expanduser("~/.codex/agent-status.json")
+DEBUG_LOG = os.path.expanduser("~/.codex/hooks/codexbar_tool_trace.log")
 
 # Event -> state mapping. None means "don't change state, only update metadata".
 EVENT_STATE_MAP = {
@@ -20,12 +22,28 @@ EVENT_STATE_MAP = {
     "SubagentStart":      "thinking",
     "PreToolUse":         "developing",
     "PermissionRequest":  "confirming",
-    "PostToolUse":        None,       # update last_tool only
+    "PostToolUse":        None,
     "Stop":               "completed",
+}
+
+# Tool names that require user interaction -> confirming state
+USER_INTERACTION_TOOLS = {
+    "request_user_input",
+    "AskUser",
 }
 
 # Events that carry tool information
 TOOL_EVENTS = {"PreToolUse", "PostToolUse"}
+
+
+def trace(msg: str) -> None:
+    """Append a line to the trace log for debugging."""
+    try:
+        ts = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+        with open(DEBUG_LOG, "a") as f:
+            f.write(f"[{ts}] {msg}\n")
+    except Exception:
+        pass
 
 
 def extract_tool_detail(event_name: str, data: dict) -> tuple[str | None, str | None]:
@@ -33,22 +51,23 @@ def extract_tool_detail(event_name: str, data: dict) -> tuple[str | None, str | 
     tool_name = data.get("tool_name")
     tool_input = data.get("tool_input") or {}
 
+    # Log every tool name we see
+    if tool_name:
+        trace(f"EVENT={event_name} TOOL={tool_name}")
+
     if not tool_name:
         return None, None
 
     if tool_name == "apply_patch":
-        # tool_input.command contains the patch; extract first file path
         cmd = tool_input.get("command", "")
         detail = cmd.split("\n")[0][:80] if cmd else "apply_patch"
         return tool_name, detail
 
     if tool_name == "Bash":
         cmd = tool_input.get("command", "")
-        # Truncate to 60 chars for display
         detail = cmd[:60] + ("..." if len(cmd) > 60 else "")
         return tool_name, detail
 
-    # MCP tools or others
     return tool_name, tool_name
 
 
@@ -67,7 +86,6 @@ def write_status_atomic(status: dict) -> None:
     fd, tmp_path = tempfile.mkstemp(dir=dir_name, suffix=".tmp")
     try:
         with os.fdopen(fd, "w") as f:
-            # Advisory lock to prevent partial reads
             fcntl.flock(f, fcntl.LOCK_EX)
             json.dump(status, f, ensure_ascii=False, indent=2)
             f.flush()
@@ -75,7 +93,6 @@ def write_status_atomic(status: dict) -> None:
             fcntl.flock(f, fcntl.LOCK_UN)
         os.replace(tmp_path, STATUS_PATH)
     except Exception:
-        # Clean up temp file on failure
         try:
             os.unlink(tmp_path)
         except OSError:
@@ -92,6 +109,13 @@ def main():
 
     event_name = data.get("hook_event_name", "")
     new_state = EVENT_STATE_MAP.get(event_name)
+
+    # For PreToolUse, check if tool requires user interaction
+    if event_name == "PreToolUse":
+        tool_name = data.get("tool_name", "")
+        if tool_name in USER_INTERACTION_TOOLS:
+            new_state = "confirming"
+            trace(f"USER_INTERACTION detected: {tool_name} -> confirming")
 
     # Load existing status and update
     status = read_existing_status()
