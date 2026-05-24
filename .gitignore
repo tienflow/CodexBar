@@ -1,4 +1,19 @@
+# Build artifacts
+build/
+CodexBar/.build/
+
+# Planning files
+.planning/
+
+# Agent instructions
+AGENTS.md
+
+# Python
 __pycache__/
 *.pyc
+
+# macOS
 .DS_Store
-.build/
+
+# Debug logs
+*.log
