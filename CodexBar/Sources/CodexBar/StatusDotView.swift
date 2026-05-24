@@ -6,6 +6,7 @@ final class PillStatusView: NSView {
     private var animTimer: Timer?
     private var animPhase: CGFloat = 0
     private var isBlinkVisible = true
+    private var drawCount = 0
 
     private let yellowColor = NSColor(red: 1.0, green: 0.76, blue: 0.03, alpha: 1.0)
     private let greenColor = NSColor(red: 0.20, green: 0.82, blue: 0.35, alpha: 1.0)
@@ -15,8 +16,11 @@ final class PillStatusView: NSView {
     private let pillHeight: CGFloat = 18
     private let dotRadius: CGFloat = 5.0
     private let borderWidth: CGFloat = 1.2
+    private let debugPath: String
 
     init() {
+        self.debugPath = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".codex/codexbar-debug.log").path
         super.init(frame: NSRect(x: 0, y: 0, width: 50, height: 18))
     }
 
@@ -27,6 +31,7 @@ final class PillStatusView: NSView {
     func update(state: AgentState) {
         let prev = currentState
         currentState = state
+        log("update: \(prev.rawValue) -> \(state.rawValue)")
         guard prev != state else { return }
         stopAnim()
         switch state {
@@ -45,6 +50,11 @@ final class PillStatusView: NSView {
     override var isFlipped: Bool { false }
 
     override func draw(_ dirtyRect: NSRect) {
+        drawCount += 1
+        if drawCount % 30 == 0 {
+            log("draw #\(drawCount) state=\(currentState.rawValue) phase=\(String(format: "%.2f", animPhase))")
+        }
+
         guard let ctx = NSGraphicsContext.current?.cgContext else { return }
         ctx.saveGState()
 
@@ -82,23 +92,17 @@ final class PillStatusView: NSView {
         switch currentState {
         case .idle:
             return (dim, dim, dim)
-
         case .thinking:
-            // Yellow breathing pulse only
             let yAlpha = 0.3 + 0.7 * abs(sin(animPhase))
             return (yAlpha, dim, dim)
-
         case .developing:
-            // Yellow-green marquee
             let p = animPhase.truncatingRemainder(dividingBy: 2.0)
             let yAlpha: CGFloat = (p < 1.0) ? 1.0 : dim
             let gAlpha: CGFloat = (p >= 1.0) ? 1.0 : dim
             return (yAlpha, gAlpha, dim)
-
         case .confirming:
             let r = isBlinkVisible ? 1.0 : 0.08
             return (dim, dim, r)
-
         case .completed:
             return (dim, 1.0, dim)
         }
@@ -135,8 +139,23 @@ final class PillStatusView: NSView {
     }
 
     private func stopAnim() {
+        log("stopAnim called, timer was \(animTimer != nil ? "active" : "nil")")
         animTimer?.invalidate()
         animTimer = nil
         animPhase = 0
+    }
+
+    private func log(_ msg: String) {
+        let ts = ISO8601DateFormatter().string(from: Date())
+        let line = "[\(ts)] [PillView] \(msg)\n"
+        if let data = line.data(using: .utf8) {
+            if let fh = FileHandle(forWritingAtPath: debugPath) {
+                fh.seekToEndOfFile()
+                fh.write(data)
+                fh.closeFile()
+            } else {
+                try? data.write(to: URL(fileURLWithPath: debugPath))
+            }
+        }
     }
 }
