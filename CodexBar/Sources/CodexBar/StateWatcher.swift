@@ -5,8 +5,9 @@ final class StateWatcher {
     private var callback: ((AgentStatus) -> Void)?
     private var lastFileState: String = ""
     private var idleTimer: Timer?
-    private var lastHookTime: Date = Date()
+    private var lastHookTime: Date = Date.distantPast
     private var inactivityTimer: Timer?
+    private var currentDisplayedState: AgentState = .idle
 
     init(callback: @escaping (AgentStatus) -> Void) {
         self.filePath = FileManager.default.homeDirectoryForCurrentUser
@@ -21,17 +22,15 @@ final class StateWatcher {
         // Reset status file on app start
         resetStatusFile()
 
-        // Start idle
         callback?(.empty)
 
-        // Poll for changes
         let timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
             self?.tick()
         }
         RunLoop.main.add(timer, forMode: .common)
 
-        // Check for inactivity every 5 seconds
-        inactivityTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
+        // Check inactivity every 3 seconds
+        inactivityTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { [weak self] _ in
             self?.checkInactivity()
         }
         RunLoop.main.add(inactivityTimer!, forMode: .common)
@@ -52,30 +51,34 @@ final class StateWatcher {
         let status = readStatus()
         let fileState = status.state.rawValue
 
-        // Skip if file state hasn't changed
         guard fileState != lastFileState else { return }
         lastFileState = fileState
 
-        // Update last hook time
+        // Update last hook time when we detect a real state change
         lastHookTime = Date()
 
         cancelIdleReset()
 
         if fileState == "idle" {
+            currentDisplayedState = .idle
             callback?(.empty)
         } else if fileState == "completed" {
+            currentDisplayedState = .completed
             callback?(status)
             scheduleIdleReset()
         } else {
+            currentDisplayedState = AgentState(rawValue: fileState) ?? .idle
             callback?(status)
         }
     }
 
     private func checkInactivity() {
         let timeSinceLastHook = Date().timeIntervalSince(lastHookTime)
-        // If no hook activity for 10 seconds and not idle, reset to idle
-        if timeSinceLastHook > 10 && lastFileState != "idle" {
+
+        // If no hook activity for 8 seconds and not idle, force idle
+        if timeSinceLastHook > 8 && currentDisplayedState != .idle {
             lastFileState = "idle"
+            currentDisplayedState = .idle
             callback?(.empty)
         }
     }
@@ -84,7 +87,7 @@ final class StateWatcher {
         cancelIdleReset()
         idleTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: false) { [weak self] _ in
             guard let self else { return }
-            
+            self.currentDisplayedState = .idle
             self.callback?(.empty)
         }
     }
