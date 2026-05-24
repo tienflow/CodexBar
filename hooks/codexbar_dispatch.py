@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import time
 import tempfile
 import fcntl
 from datetime import datetime, timezone, timedelta
@@ -16,7 +17,7 @@ EVENT_STATE_MAP = {
     "UserPromptSubmit":   "thinking",
     "SubagentStart":      "thinking",
     "PreToolUse":         "developing",
-    "PostToolUse":        "thinking",
+    "PostToolUse":        None,
     "PermissionRequest":  "confirming",
     "Stop":               "completed",
 }
@@ -110,19 +111,17 @@ def main():
     active_session = status.get("active_session", False)
 
     if event_name == "SessionStart":
-        # Fresh session — not active until user submits a prompt
         active_session = False
+    elif event_name == "UserPromptUse":
+        active_session = True
     elif event_name == "UserPromptSubmit":
-        # User explicitly submits a prompt -> session is active
         active_session = True
     elif event_name == "Stop":
-        # Task done — session ends
         active_session = False
 
     status["active_session"] = active_session
 
     # -- Gate active states behind session --
-    # If there's no active session, suppress tool/subagent-based state changes
     if event_name in ACTIVE_SESSION_GATED and not active_session:
         trace(f"BACKGROUND: {event_name} suppressed (no active session)")
         new_state = None
@@ -155,7 +154,9 @@ def main():
         status["state"] = new_state
         trace(f"STATE -> {new_state}")
 
+    # Track tool activity timestamp for developing timeout in StateWatcher
     if event_name in TOOL_EVENTS:
+        status["last_tool_time"] = time.time()
         tool, detail = extract_tool_detail(event_name, data)
         if tool:
             status["last_tool"] = tool
@@ -165,6 +166,7 @@ def main():
     if event_name == "SessionStart":
         status.pop("last_tool", None)
         status.pop("last_tool_detail", None)
+        status.pop("last_tool_time", None)
 
     write_status_atomic(status)
 
