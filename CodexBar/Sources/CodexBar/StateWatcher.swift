@@ -5,7 +5,6 @@ final class StateWatcher {
     private var callback: ((AgentStatus) -> Void)?
     private var lastFileState: String = ""
     private var idleTimer: Timer?
-    private var waitingForIdle: Bool = false
 
     init(callback: @escaping (AgentStatus) -> Void) {
         self.filePath = FileManager.default.homeDirectoryForCurrentUser
@@ -36,16 +35,12 @@ final class StateWatcher {
         cancelIdleReset()
 
         if fileState == "idle" {
-            waitingForIdle = false
             callback?(.empty)
         } else if fileState == "completed" {
-            waitingForIdle = true
             callback?(status)
             // Only go idle after Stop event
             scheduleIdleReset()
         } else {
-            // thinking, developing, confirming
-            waitingForIdle = false
             callback?(status)
         }
     }
@@ -54,8 +49,7 @@ final class StateWatcher {
         cancelIdleReset()
         idleTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: false) { [weak self] _ in
             guard let self else { return }
-            self.waitingForIdle = false
-            self.lastFileState = ""
+            // Don't reset lastFileState - prevent Codex from triggering completed again
             self.callback?(.empty)
         }
     }
