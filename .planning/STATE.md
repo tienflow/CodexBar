@@ -12,14 +12,14 @@ See: .planning/PROJECT.md (updated 2026-05-24)
 | Phase | Status | Started | Completed |
 |-------|--------|---------|-----------|
 | Phase 1: Hook 调度系统 | Complete | 2026-05-24 | 2026-05-24 |
-| Phase 2: Swift 菜单栏 App | In Progress | 2026-05-24 | — |
+| Phase 2: Swift 菜单栏 App | Complete | 2026-05-24 | 2026-05-24 |
 
 ## Decisions
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
 | Python hook 脚本 | Codex hooks 支持命令执行，Python 无需额外依赖 | ✓ Good |
-| FSEventStream 监听 | macOS 原生文件监听，高效且低延迟 | — Pending |
+| FSEventStream 监听 | macOS 原生文件监听，高效且低延迟 | ✓ Good |
 | 原子写入状态文件 | 防止读写竞争导致 JSON 损坏 | ✓ Good |
 | 呼吸脉冲 vs 跑马灯 | 菜单栏图标尺寸小，呼吸脉冲更清晰 | ✓ Good |
 | 黄色=思考 绿色=开发 | 符合交通灯直觉：黄灯过渡→绿灯行动 | ✓ Good |
@@ -36,3 +36,5 @@ See: .planning/PROJECT.md (updated 2026-05-24)
 | 2026-05-24 | Phase 1 | Context gathered | .planning/phases/01-hook/01-CONTEXT.md |
 | 2026-05-24 | Phase 1 | Plan created | .planning/phases/01-hook/01-PLAN.md |
 | 2026-05-24 | Phase 1 | Executed (17 tests passing) | hooks/codexbar_dispatch.py |
+| 2026-05-24 | Phase 2 | Context + Plan | .planning/phases/02-swift-app/ |
+| 2026-05-24 | Phase 2 | Executed (build successful) | CodexBar/ |
