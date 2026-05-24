@@ -11,7 +11,7 @@ See: .planning/PROJECT.md (updated 2026-05-24)
 
 | Phase | Status | Started | Completed |
 |-------|--------|---------|-----------|
-| Phase 1: Hook 调度系统 | In Progress | 2026-05-24 | — |
+| Phase 1: Hook 调度系统 | Planned | 2026-05-24 | — |
 | Phase 2: Swift 菜单栏 App | Pending | — | — |
 
 ## Decisions
@@ -34,3 +34,4 @@ See: .planning/PROJECT.md (updated 2026-05-24)
 | Session | Phase | Action | File |
 |---------|-------|--------|------|
 | 2026-05-24 | Phase 1 | Context gathered | .planning/phases/01-hook/01-CONTEXT.md |
+| 2026-05-24 | Phase 1 | Plan created | .planning/phases/01-hook/01-PLAN.md |
