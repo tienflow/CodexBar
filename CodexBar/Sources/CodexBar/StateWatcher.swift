@@ -5,7 +5,6 @@ final class StateWatcher {
     private var callback: ((AgentStatus) -> Void)?
     private var lastFileState: String = ""
     private var idleTimer: Timer?
-    private var isIdle: Bool = true
 
     init(callback: @escaping (AgentStatus) -> Void) {
         self.filePath = FileManager.default.homeDirectoryForCurrentUser
@@ -17,7 +16,6 @@ final class StateWatcher {
         let dir = (filePath as NSString).deletingLastPathComponent
         try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
 
-        // Start idle
         callback?(.empty)
 
         let timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
@@ -30,22 +28,18 @@ final class StateWatcher {
         let status = readStatus()
         let fileState = status.state.rawValue
 
-        // Only react when file state actually changes
+        // Skip if file state hasn't changed
         guard fileState != lastFileState else { return }
         lastFileState = fileState
 
-        // Ignore idle/completed when we're already idle
-        if isIdle && (fileState == "idle" || fileState == "completed") {
-            return
-        }
-
         cancelIdleReset()
 
-        if fileState == "completed" {
+        if fileState == "idle" {
+            callback?(.empty)
+        } else if fileState == "completed" {
             callback?(status)
             scheduleIdleReset()
-        } else if fileState != "idle" {
-            isIdle = false
+        } else {
             callback?(status)
         }
     }
@@ -54,8 +48,7 @@ final class StateWatcher {
         cancelIdleReset()
         idleTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: false) { [weak self] _ in
             guard let self else { return }
-            self.isIdle = true
-            self.lastFileState = ""
+            // Don't reset lastFileState - prevent Codex from triggering completed again
             self.callback?(.empty)
         }
     }
