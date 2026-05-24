@@ -84,7 +84,7 @@ final class StateWatcher {
         cancelIdleReset()
         idleTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: false) { [weak self] _ in
             guard let self else { return }
-            self.lastFileState = ""
+            
             self.callback?(.empty)
         }
     }
