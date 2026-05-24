@@ -14,8 +14,8 @@ DEBUG_LOG = os.path.expanduser("~/.codex/hooks/codexbar_tool_trace.log")
 
 EVENT_STATE_MAP = {
     "SessionStart":       "idle",
-    "UserPromptSubmit":   "thinking",
-    "SubagentStart":      "thinking",
+    "UserPromptSubmit":   "developing",
+    "SubagentStart":      "developing",
     "PreToolUse":         "developing",
     "PostToolUse":        None,
     "PermissionRequest":  "confirming",
@@ -29,7 +29,7 @@ USER_INTERACTION_TOOLS = {
 
 TOOL_EVENTS = {"PreToolUse", "PostToolUse"}
 
-# Events that don't require an active session (idle/completed are always safe)
+# Events that don't require an active session
 ACTIVE_SESSION_GATED = {"PreToolUse", "PostToolUse", "PermissionRequest", "SubagentStart"}
 
 
@@ -102,7 +102,6 @@ def main():
     event_name = data.get("hook_event_name", "")
     new_state = EVENT_STATE_MAP.get(event_name)
 
-    # Log ALL events with full detail
     trace(f"HOOK={event_name} state={new_state} tool={data.get('tool_name','')} mode={data.get('permission_mode','')}")
 
     status = read_existing_status()
@@ -112,8 +111,6 @@ def main():
 
     if event_name == "SessionStart":
         active_session = False
-    elif event_name == "UserPromptUse":
-        active_session = True
     elif event_name == "UserPromptSubmit":
         active_session = True
     elif event_name == "Stop":
@@ -154,7 +151,6 @@ def main():
         status["state"] = new_state
         trace(f"STATE -> {new_state}")
 
-    # Track tool activity timestamp for developing timeout in StateWatcher
     if event_name in TOOL_EVENTS:
         status["last_tool_time"] = time.time()
         tool, detail = extract_tool_detail(event_name, data)

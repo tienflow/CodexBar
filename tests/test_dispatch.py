@@ -54,10 +54,10 @@ class TestEventStateMap(unittest.TestCase):
         self.assertEqual(dispatch.EVENT_STATE_MAP["SessionStart"], "idle")
 
     def test_user_prompt_submit(self):
-        self.assertEqual(dispatch.EVENT_STATE_MAP["UserPromptSubmit"], "thinking")
+        self.assertEqual(dispatch.EVENT_STATE_MAP["UserPromptSubmit"], "developing")
 
     def test_subagent_start(self):
-        self.assertEqual(dispatch.EVENT_STATE_MAP["SubagentStart"], "thinking")
+        self.assertEqual(dispatch.EVENT_STATE_MAP["SubagentStart"], "developing")
 
     def test_pre_tool_use(self):
         self.assertEqual(dispatch.EVENT_STATE_MAP["PreToolUse"], "developing")
@@ -165,7 +165,7 @@ class TestActiveSessionLifecycle(unittest.TestCase):
     def test_userprompt_starts_session(self):
         self._simulate("SessionStart")
         status = self._simulate("UserPromptSubmit", session_id="s1")
-        self.assertEqual(status["state"], "thinking")
+        self.assertEqual(status["state"], "developing")
         self.assertTrue(status["active_session"])
 
         status = self._simulate("PreToolUse", tool_name="apply_patch", session_id="s1")
@@ -219,7 +219,7 @@ class TestActiveSessionLifecycle(unittest.TestCase):
 
         self._simulate("UserPromptSubmit", session_id="s1")
         status = self._simulate("SubagentStart", session_id="s1")
-        self.assertEqual(status["state"], "thinking")
+        self.assertEqual(status["state"], "developing")
         self.assertTrue(status["active_session"])
 
     def test_permission_request_gated(self):
@@ -245,7 +245,7 @@ class TestActiveSessionLifecycle(unittest.TestCase):
 
         status = self._simulate("UserPromptSubmit", session_id="s2")
         self.assertTrue(status["active_session"])
-        self.assertEqual(status["state"], "thinking")
+        self.assertEqual(status["state"], "developing")
 
         status = self._simulate("PreToolUse", tool_name="apply_patch", session_id="s2")
         self.assertEqual(status["state"], "developing")
