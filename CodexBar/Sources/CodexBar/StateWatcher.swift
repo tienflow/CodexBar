@@ -5,10 +5,7 @@ final class StateWatcher {
     private var callback: ((AgentStatus) -> Void)?
     private var lastFileState: String = ""
     private var idleTimer: Timer?
-    private var lastHookTime: Date = Date.distantPast
-    private var inactivityTimer: Timer?
     private var currentDisplayedState: AgentState = .idle
-    private var userActive: Bool = false  // True after UserPromptSubmit, false after Stop
 
     init(callback: @escaping (AgentStatus) -> Void) {
         self.filePath = FileManager.default.homeDirectoryForCurrentUser
@@ -26,11 +23,6 @@ final class StateWatcher {
             self?.tick()
         }
         RunLoop.main.add(timer, forMode: .common)
-
-        inactivityTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { [weak self] _ in
-            self?.checkInactivity()
-        }
-        RunLoop.main.add(inactivityTimer!, forMode: .common)
     }
 
     private func resetStatusFile() {
@@ -46,14 +38,6 @@ final class StateWatcher {
         let fileState = status.state.rawValue
         guard fileState != lastFileState else { return }
         lastFileState = fileState
-        lastHookTime = Date()
-
-        // Track if user is actively engaged
-        if fileState == "thinking" || fileState == "confirming" {
-            userActive = true
-        } else if fileState == "completed" || fileState == "idle" {
-            userActive = false
-        }
 
         cancelIdleReset()
 
@@ -63,23 +47,11 @@ final class StateWatcher {
         } else if fileState == "completed" {
             currentDisplayedState = .completed
             callback?(status)
+            // Only go idle after Stop event
             scheduleIdleReset()
-        } else if fileState == "developing" && userActive {
-            // Only show developing if user is actively engaged
-            currentDisplayedState = .developing
-            callback?(status)
-        } else if fileState == "thinking" || fileState == "confirming" {
+        } else if fileState == "thinking" || fileState == "developing" || fileState == "confirming" {
             currentDisplayedState = AgentState(rawValue: fileState) ?? .idle
             callback?(status)
-        }
-        // Ignore isolated "developing" events when user is not active
-    }
-
-    private func checkInactivity() {
-        let timeSinceLastHook = Date().timeIntervalSince(lastHookTime)
-        if timeSinceLastHook > 5 && currentDisplayedState != .idle {
-            currentDisplayedState = .idle
-            callback?(.empty)
         }
     }
 
