@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-05-24)
 
 **Core value:** 实时、准确地反映 Codex 的工作状态，让用户一眼知道 Codex 在做什么、是否需要自己介入。
-**Current focus:** Phase 1 - Hook 调度系统
+**Current focus:** Phase 2 - Swift 菜单栏 App
 
 ## Progress
 
 | Phase | Status | Started | Completed |
 |-------|--------|---------|-----------|
-| Phase 1: Hook 调度系统 | Planned | 2026-05-24 | — |
-| Phase 2: Swift 菜单栏 App | Pending | — | — |
+| Phase 1: Hook 调度系统 | Complete | 2026-05-24 | 2026-05-24 |
+| Phase 2: Swift 菜单栏 App | In Progress | 2026-05-24 | — |
 
 ## Decisions
 
@@ -35,3 +35,4 @@ See: .planning/PROJECT.md (updated 2026-05-24)
 |---------|-------|--------|------|
 | 2026-05-24 | Phase 1 | Context gathered | .planning/phases/01-hook/01-CONTEXT.md |
 | 2026-05-24 | Phase 1 | Plan created | .planning/phases/01-hook/01-PLAN.md |
+| 2026-05-24 | Phase 1 | Executed (17 tests passing) | hooks/codexbar_dispatch.py |
