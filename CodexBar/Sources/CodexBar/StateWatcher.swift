@@ -5,7 +5,6 @@ final class StateWatcher {
     private var callback: ((AgentStatus) -> Void)?
     private var lastFileState: String = ""
     private var idleTimer: Timer?
-    private var currentDisplayedState: AgentState = .idle
 
     init(callback: @escaping (AgentStatus) -> Void) {
         self.filePath = FileManager.default.homeDirectoryForCurrentUser
@@ -16,7 +15,8 @@ final class StateWatcher {
     func start() {
         let dir = (filePath as NSString).deletingLastPathComponent
         try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
-        resetStatusFile()
+
+        // Start in idle
         callback?(.empty)
 
         let timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
@@ -25,41 +25,34 @@ final class StateWatcher {
         RunLoop.main.add(timer, forMode: .common)
     }
 
-    private func resetStatusFile() {
-        let empty: [String: Any] = ["state": "idle", "timestamp": ISO8601DateFormatter().string(from: Date())]
-        if let data = try? JSONSerialization.data(withJSONObject: empty, options: .prettyPrinted) {
-            try? data.write(to: URL(fileURLWithPath: filePath))
-        }
-        lastFileState = "idle"
-    }
-
     private func tick() {
         let status = readStatus()
         let fileState = status.state.rawValue
+
+        // Skip if file state hasn't changed
         guard fileState != lastFileState else { return }
         lastFileState = fileState
 
         cancelIdleReset()
 
         if fileState == "idle" {
-            currentDisplayedState = .idle
+            // Only go idle if we're not already waiting for completed timeout
             callback?(.empty)
         } else if fileState == "completed" {
-            currentDisplayedState = .completed
             callback?(status)
             // Only go idle after Stop event
             scheduleIdleReset()
-        } else if fileState == "thinking" || fileState == "developing" || fileState == "confirming" {
-            currentDisplayedState = AgentState(rawValue: fileState) ?? .idle
+        } else {
+            // thinking, developing, confirming
             callback?(status)
         }
     }
 
     private func scheduleIdleReset() {
         cancelIdleReset()
-        idleTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: false) { [weak self] _ in
+        idleTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: false) { [weak self] _ in
             guard let self else { return }
-            self.currentDisplayedState = .idle
+            self.lastFileState = ""
             self.callback?(.empty)
         }
     }
