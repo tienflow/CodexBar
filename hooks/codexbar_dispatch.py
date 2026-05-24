@@ -19,6 +19,8 @@ EVENT_STATE_MAP = {
     "PreToolUse":         "developing",
     "PostToolUse":        None,
     "PermissionRequest":  "confirming",
+    "PreCompact":         "thinking",
+    "PostCompact":        "thinking",
     "Stop":               "completed",
 }
 
@@ -30,7 +32,7 @@ USER_INTERACTION_TOOLS = {
 TOOL_EVENTS = {"PreToolUse", "PostToolUse"}
 
 # Events that don't require an active session
-ACTIVE_SESSION_GATED = {"PreToolUse", "PostToolUse", "PermissionRequest", "SubagentStart"}
+ACTIVE_SESSION_GATED = {"PreToolUse", "PostToolUse", "PermissionRequest", "SubagentStart", "PreCompact", "PostCompact"}
 
 
 def trace(msg: str) -> None:
