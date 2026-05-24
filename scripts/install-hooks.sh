@@ -1,28 +1,19 @@
 #!/bin/bash
 # CodexBar Hook Installer
-# Copies dispatch script and hooks.json to ~/.codex/
-
 set -e
 
-SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 CODEX_DIR="$HOME/.codex"
 HOOKS_DIR="$CODEX_DIR/hooks"
-DISPATCH_SRC="$SCRIPT_DIR/hooks/codexbar_dispatch.py"
 DISPATCH_DST="$HOOKS_DIR/codexbar_dispatch.py"
-HOOKS_JSON_SRC="$SCRIPT_DIR/hooks/hooks.json"
-HOOKS_JSON_DST="$CODEX_DIR/hooks.json"
 
 echo "CodexBar Hook Installer"
 echo "======================="
 
-# Check source files exist
-if [ ! -f "$DISPATCH_SRC" ]; then
-    echo "Error: $DISPATCH_SRC not found"
-    exit 1
-fi
-
-if [ ! -f "$HOOKS_JSON_SRC" ]; then
-    echo "Error: $HOOKS_JSON_SRC not found"
+# Check if ~/.codex exists
+if [ ! -d "$CODEX_DIR" ]; then
+    echo "Error: ~/.codex directory not found"
+    echo "Please install Codex first: https://github.com/openai/codex"
     exit 1
 fi
 
@@ -30,29 +21,37 @@ fi
 mkdir -p "$HOOKS_DIR"
 
 # Copy dispatch script
-cp "$DISPATCH_SRC" "$DISPATCH_DST"
+cp "$SCRIPT_DIR/codexbar_dispatch.py" "$DISPATCH_DST"
 chmod +x "$DISPATCH_DST"
 echo "✓ Installed dispatch script to $DISPATCH_DST"
 
-# Check if hooks.json already exists
-if [ -f "$HOOKS_JSON_DST" ]; then
+# Check for existing hooks.json
+if [ -f "$CODEX_DIR/hooks.json" ]; then
     echo ""
-    echo "⚠ hooks.json already exists at $HOOKS_JSON_DST"
-    echo "  CodexBar hooks will be merged with existing hooks."
-    echo "  Manual merge may be required."
-    echo ""
-    echo "  To install manually:"
-    echo "  1. Add the hook entries from $HOOKS_JSON_SRC to $HOOKS_JSON_DST"
-    echo "  2. Or replace $HOOKS_JSON_DST (WARNING: overwrites existing hooks)"
+    echo "⚠ hooks.json already exists at $CODEX_DIR/hooks.json"
+    echo "  You may need to merge the CodexBar hooks manually."
 else
-    cp "$HOOKS_JSON_SRC" "$HOOKS_JSON_DST"
-    echo "✓ Installed hooks.json to $HOOKS_JSON_DST"
+    # Create hooks.json
+    cat > "$CODEX_DIR/hooks.json" << 'HOOKS'
+{
+  "hooks": {
+    "SessionStart": [{"hooks": [{"type": "command", "command": "/usr/bin/python3 ~/.codex/hooks/codexbar_dispatch.py", "timeout": 5}]}],
+    "UserPromptSubmit": [{"hooks": [{"type": "command", "command": "/usr/bin/python3 ~/.codex/hooks/codexbar_dispatch.py", "timeout": 5}]}],
+    "SubagentStart": [{"hooks": [{"type": "command", "command": "/usr/bin/python3 ~/.codex/hooks/codexbar_dispatch.py", "timeout": 5}]}],
+    "PreToolUse": [{"hooks": [{"type": "command", "command": "/usr/bin/python3 ~/.codex/hooks/codexbar_dispatch.py", "timeout": 5}]}],
+    "PostToolUse": [{"hooks": [{"type": "command", "command": "/usr/bin/python3 ~/.codex/hooks/codexbar_dispatch.py", "timeout": 5}]}],
+    "PermissionRequest": [{"hooks": [{"type": "command", "command": "/usr/bin/python3 ~/.codex/hooks/codexbar_dispatch.py", "timeout": 5}]}],
+    "Stop": [{"hooks": [{"type": "command", "command": "/usr/bin/python3 ~/.codex/hooks/codexbar_dispatch.py", "timeout": 5}]}]
+  }
+}
+HOOKS
+    echo "✓ Installed hooks.json to $CODEX_DIR/hooks.json"
 fi
 
 echo ""
 echo "Installation complete!"
 echo ""
 echo "Next steps:"
-echo "  1. Review the hooks in $HOOKS_JSON_DST"
-echo "  2. Start Codex - it will prompt you to trust the new hooks"
-echo "  3. Click 'Trust' to enable CodexBar"
+echo "  1. Restart Codex"
+echo "  2. Codex will prompt you to trust the hooks - click 'Trust'"
+echo "  3. Launch CodexBar from Applications"
