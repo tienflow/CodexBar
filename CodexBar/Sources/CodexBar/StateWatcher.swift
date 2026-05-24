@@ -5,6 +5,7 @@ final class StateWatcher {
     private var callback: ((AgentStatus) -> Void)?
     private var lastFileState: String = ""
     private var idleTimer: Timer?
+    private var waitingForIdle: Bool = false
 
     init(callback: @escaping (AgentStatus) -> Void) {
         self.filePath = FileManager.default.homeDirectoryForCurrentUser
@@ -16,7 +17,6 @@ final class StateWatcher {
         let dir = (filePath as NSString).deletingLastPathComponent
         try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
 
-        // Start in idle
         callback?(.empty)
 
         let timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
@@ -36,14 +36,16 @@ final class StateWatcher {
         cancelIdleReset()
 
         if fileState == "idle" {
-            // Only go idle if we're not already waiting for completed timeout
+            waitingForIdle = false
             callback?(.empty)
         } else if fileState == "completed" {
+            waitingForIdle = true
             callback?(status)
             // Only go idle after Stop event
             scheduleIdleReset()
         } else {
             // thinking, developing, confirming
+            waitingForIdle = false
             callback?(status)
         }
     }
@@ -52,6 +54,7 @@ final class StateWatcher {
         cancelIdleReset()
         idleTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: false) { [weak self] _ in
             guard let self else { return }
+            self.waitingForIdle = false
             self.lastFileState = ""
             self.callback?(.empty)
         }
