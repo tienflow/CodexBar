@@ -16,19 +16,6 @@ enum AgentState: String, Codable, CaseIterable {
         case .completed:  return "已完成"
         }
     }
-
-    /// Breathing pulse period in seconds. 0 means no animation.
-    var pulsePeriod: Double {
-        switch self {
-        case .thinking:    return 1.5
-        case .developing:  return 2.5
-        default:           return 0
-        }
-    }
-
-    var isBlinking: Bool {
-        self == .confirming
-    }
 }
 
 struct AgentStatus: Codable {

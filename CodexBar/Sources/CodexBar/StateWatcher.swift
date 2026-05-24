@@ -1,84 +1,75 @@
 import Foundation
-import CoreServices
 
-/// Watches ~/.codex/agent-status.json for changes via FSEventStream.
 final class StateWatcher {
-    private var eventStream: FSEventStreamRef?
-    private let statusFilePath: String
-    private var onStatusChange: ((AgentStatus) -> Void)?
+    private let filePath: String
+    private var callback: ((AgentStatus) -> Void)?
+    private var lastFileState: String = ""
+    private var idleTimer: Timer?
+    private var isIdle: Bool = true
 
-    init(onStatusChange: @escaping (AgentStatus) -> Void) {
-        self.statusFilePath = FileManager.default.homeDirectoryForCurrentUser
+    init(callback: @escaping (AgentStatus) -> Void) {
+        self.filePath = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".codex/agent-status.json").path
-        self.onStatusChange = onStatusChange
+        self.callback = callback
     }
 
     func start() {
-        let dir = (statusFilePath as NSString).deletingLastPathComponent
+        let dir = (filePath as NSString).deletingLastPathComponent
         try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
 
-        notifyIfChanged()
+        // Start idle
+        callback?(.empty)
 
-        let path = dir as CFString
-        var context = FSEventStreamContext()
-        context.info = Unmanaged.passUnretained(self).toOpaque()
-
-        guard let stream = FSEventStreamCreate(
-            nil,
-            fileChangeCallback,
-            &context,
-            [path] as CFArray,
-            FSEventStreamEventId(kFSEventStreamEventIdSinceNow),
-            0.3,
-            FSEventStreamCreateFlags(kFSEventStreamCreateFlagFileEvents)
-        ) else { return }
-
-        eventStream = stream
-        FSEventStreamScheduleWithRunLoop(stream, CFRunLoopGetMain(), CFRunLoopMode.defaultMode.rawValue)
-        FSEventStreamStart(stream)
-    }
-
-    func stop() {
-        if let stream = eventStream {
-            FSEventStreamStop(stream)
-            FSEventStreamInvalidate(stream)
-            FSEventStreamRelease(stream)
-            eventStream = nil
+        let timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+            self?.tick()
         }
+        RunLoop.main.add(timer, forMode: .common)
     }
 
-    fileprivate func notifyIfChanged() {
-        guard let data = FileManager.default.contents(atPath: statusFilePath),
-              let status = try? JSONDecoder().decode(AgentStatus.self, from: data) else {
-            onStatusChange?(.empty)
+    private func tick() {
+        let status = readStatus()
+        let fileState = status.state.rawValue
+
+        // Only react when file state actually changes
+        guard fileState != lastFileState else { return }
+        lastFileState = fileState
+
+        // Ignore idle/completed when we're already idle
+        if isIdle && (fileState == "idle" || fileState == "completed") {
             return
         }
-        onStatusChange?(status)
-    }
-}
 
-private func fileChangeCallback(
-    _ streamRef: ConstFSEventStreamRef,
-    _ clientCallBackInfo: UnsafeMutableRawPointer?,
-    _ numEvents: Int,
-    _ eventPaths: UnsafeMutableRawPointer,
-    _ eventFlags: UnsafePointer<FSEventStreamEventFlags>,
-    _ eventIds: UnsafePointer<FSEventStreamEventId>
-) {
-    guard let info = clientCallBackInfo else { return }
-    let watcher = Unmanaged<StateWatcher>.fromOpaque(info).takeUnretainedValue()
+        cancelIdleReset()
 
-    let paths = Unmanaged<CFArray>.fromOpaque(eventPaths).takeUnretainedValue() as! [String]
-
-    for i in 0..<numEvents {
-        let flags = eventFlags[i]
-        let relevantFlags: UInt32 = UInt32(kFSEventStreamEventFlagItemModified)
-            | UInt32(kFSEventStreamEventFlagItemRenamed)
-            | UInt32(kFSEventStreamEventFlagItemCreated)
-
-        if (flags & relevantFlags) != 0 && paths[i].hasSuffix("agent-status.json") {
-            watcher.notifyIfChanged()
-            break
+        if fileState == "completed" {
+            callback?(status)
+            scheduleIdleReset()
+        } else if fileState != "idle" {
+            isIdle = false
+            callback?(status)
         }
+    }
+
+    private func scheduleIdleReset() {
+        cancelIdleReset()
+        idleTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: false) { [weak self] _ in
+            guard let self else { return }
+            self.isIdle = true
+            self.lastFileState = ""
+            self.callback?(.empty)
+        }
+    }
+
+    private func cancelIdleReset() {
+        idleTimer?.invalidate()
+        idleTimer = nil
+    }
+
+    private func readStatus() -> AgentStatus {
+        guard let data = FileManager.default.contents(atPath: filePath),
+              let s = try? JSONDecoder().decode(AgentStatus.self, from: data) else {
+            return .empty
+        }
+        return s
     }
 }

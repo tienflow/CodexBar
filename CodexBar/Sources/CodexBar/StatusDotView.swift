@@ -105,7 +105,7 @@ final class PillStatusView: NSView {
     }
 
     private func startBreathing() {
-        let timer = Timer(timeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
+        let timer = Timer(timeInterval: 1.0 / 20.0, repeats: true) { [weak self] _ in
             guard let self else { return }
             self.animPhase += 0.10
             self.needsDisplay = true
