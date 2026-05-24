@@ -8,6 +8,7 @@ final class StateWatcher {
     private var lastHookTime: Date = Date.distantPast
     private var inactivityTimer: Timer?
     private var currentDisplayedState: AgentState = .idle
+    private var userActive: Bool = false  // True after UserPromptSubmit, false after Stop
 
     init(callback: @escaping (AgentStatus) -> Void) {
         self.filePath = FileManager.default.homeDirectoryForCurrentUser
@@ -18,10 +19,7 @@ final class StateWatcher {
     func start() {
         let dir = (filePath as NSString).deletingLastPathComponent
         try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
-
-        // Reset status file on app start
         resetStatusFile()
-
         callback?(.empty)
 
         let timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
@@ -29,7 +27,6 @@ final class StateWatcher {
         }
         RunLoop.main.add(timer, forMode: .common)
 
-        // Check inactivity every 3 seconds
         inactivityTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { [weak self] _ in
             self?.checkInactivity()
         }
@@ -37,11 +34,8 @@ final class StateWatcher {
     }
 
     private func resetStatusFile() {
-        let emptyStatus: [String: Any] = [
-            "state": "idle",
-            "timestamp": ISO8601DateFormatter().string(from: Date())
-        ]
-        if let data = try? JSONSerialization.data(withJSONObject: emptyStatus, options: .prettyPrinted) {
+        let empty: [String: Any] = ["state": "idle", "timestamp": ISO8601DateFormatter().string(from: Date())]
+        if let data = try? JSONSerialization.data(withJSONObject: empty, options: .prettyPrinted) {
             try? data.write(to: URL(fileURLWithPath: filePath))
         }
         lastFileState = "idle"
@@ -50,12 +44,16 @@ final class StateWatcher {
     private func tick() {
         let status = readStatus()
         let fileState = status.state.rawValue
-
         guard fileState != lastFileState else { return }
         lastFileState = fileState
-
-        // Update last hook time when we detect a real state change
         lastHookTime = Date()
+
+        // Track if user is actively engaged
+        if fileState == "thinking" || fileState == "confirming" {
+            userActive = true
+        } else if fileState == "completed" || fileState == "idle" {
+            userActive = false
+        }
 
         cancelIdleReset()
 
@@ -66,18 +64,20 @@ final class StateWatcher {
             currentDisplayedState = .completed
             callback?(status)
             scheduleIdleReset()
-        } else {
+        } else if fileState == "developing" && userActive {
+            // Only show developing if user is actively engaged
+            currentDisplayedState = .developing
+            callback?(status)
+        } else if fileState == "thinking" || fileState == "confirming" {
             currentDisplayedState = AgentState(rawValue: fileState) ?? .idle
             callback?(status)
         }
+        // Ignore isolated "developing" events when user is not active
     }
 
     private func checkInactivity() {
         let timeSinceLastHook = Date().timeIntervalSince(lastHookTime)
-
-        // If no hook activity for 8 seconds and not idle, force idle
-        if timeSinceLastHook > 8 && currentDisplayedState != .idle {
-            lastFileState = "idle"
+        if timeSinceLastHook > 5 && currentDisplayedState != .idle {
             currentDisplayedState = .idle
             callback?(.empty)
         }
