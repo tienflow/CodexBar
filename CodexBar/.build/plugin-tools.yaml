@@ -1,0 +1,81 @@
+client:
+  name: basic
+  file-system: device-agnostic
+tools: {}
+targets:
+  "CodexBar-arm64-apple-macosx-debug.exe": ["<CodexBar-arm64-apple-macosx-debug.exe>"]
+  "CodexBar-arm64-apple-macosx-debug.module": ["<CodexBar-arm64-apple-macosx-debug.module>"]
+  "PackageStructure": ["<PackageStructure>"]
+  "main": ["<CodexBar-arm64-apple-macosx-debug.exe>","<CodexBar-arm64-apple-macosx-debug.module>"]
+  "test": ["<CodexBar-arm64-apple-macosx-debug.exe>","<CodexBar-arm64-apple-macosx-debug.module>"]
+default: "main"
+nodes:
+  "/Users/apple/Downloads/dev1/CodexBar/Sources/CodexBar/":
+    is-directory-structure: true
+    content-exclusion-patterns: [".git",".build"]
+  "/Users/apple/Downloads/dev1/CodexBar/.build/arm64-apple-macosx/debug/CodexBar":
+    is-mutated: true
+commands:
+  "/Users/apple/Downloads/dev1/CodexBar/.build/arm64-apple-macosx/debug/CodexBar-entitlement.plist":
+    tool: write-auxiliary-file
+    inputs: ["<entitlement-plist>","<com.apple.security.get-task-allow>"]
+    outputs: ["/Users/apple/Downloads/dev1/CodexBar/.build/arm64-apple-macosx/debug/CodexBar-entitlement.plist"]
+    description: "Write auxiliary file /Users/apple/Downloads/dev1/CodexBar/.build/arm64-apple-macosx/debug/CodexBar-entitlement.plist"
+
+  "/Users/apple/Downloads/dev1/CodexBar/.build/arm64-apple-macosx/debug/CodexBar.build/sources":
+    tool: write-auxiliary-file
+    inputs: ["<sources-file-list>","/Users/apple/Downloads/dev1/CodexBar/Sources/CodexBar/CodexBarApp.swift","/Users/apple/Downloads/dev1/CodexBar/Sources/CodexBar/StateWatcher.swift","/Users/apple/Downloads/dev1/CodexBar/Sources/CodexBar/StatusBarController.swift","/Users/apple/Downloads/dev1/CodexBar/Sources/CodexBar/StatusDotView.swift","/Users/apple/Downloads/dev1/CodexBar/Sources/CodexBar/StatusModels.swift"]
+    outputs: ["/Users/apple/Downloads/dev1/CodexBar/.build/arm64-apple-macosx/debug/CodexBar.build/sources"]
+    description: "Write auxiliary file /Users/apple/Downloads/dev1/CodexBar/.build/arm64-apple-macosx/debug/CodexBar.build/sources"
+
+  "/Users/apple/Downloads/dev1/CodexBar/.build/arm64-apple-macosx/debug/CodexBar.product/Objects.LinkFileList":
+    tool: write-auxiliary-file
+    inputs: ["<link-file-list>","/Users/apple/Downloads/dev1/CodexBar/.build/arm64-apple-macosx/debug/CodexBar.build/CodexBarApp.swift.o","/Users/apple/Downloads/dev1/CodexBar/.build/arm64-apple-macosx/debug/CodexBar.build/StateWatcher.swift.o","/Users/apple/Downloads/dev1/CodexBar/.build/arm64-apple-macosx/debug/CodexBar.build/StatusBarController.swift.o","/Users/apple/Downloads/dev1/CodexBar/.build/arm64-apple-macosx/debug/CodexBar.build/StatusDotView.swift.o","/Users/apple/Downloads/dev1/CodexBar/.build/arm64-apple-macosx/debug/CodexBar.build/StatusModels.swift.o"]
+    outputs: ["/Users/apple/Downloads/dev1/CodexBar/.build/arm64-apple-macosx/debug/CodexBar.product/Objects.LinkFileList"]
+    description: "Write auxiliary file /Users/apple/Downloads/dev1/CodexBar/.build/arm64-apple-macosx/debug/CodexBar.product/Objects.LinkFileList"
+
+  "/Users/apple/Downloads/dev1/CodexBar/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt":
+    tool: write-auxiliary-file
+    inputs: ["<swift-get-version>","/Library/Developer/CommandLineTools/usr/bin/swiftc"]
+    outputs: ["/Users/apple/Downloads/dev1/CodexBar/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt"]
+    always-out-of-date: "true"
+    description: "Write auxiliary file /Users/apple/Downloads/dev1/CodexBar/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt"
+
+  "<CodexBar-arm64-apple-macosx-debug.exe>":
+    tool: phony
+    inputs: ["<CodexBar-arm64-apple-macosx-debug.exe-CodeSigning>"]
+    outputs: ["<CodexBar-arm64-apple-macosx-debug.exe>"]
+
+  "<CodexBar-arm64-apple-macosx-debug.module>":
+    tool: phony
+    inputs: ["/Users/apple/Downloads/dev1/CodexBar/.build/arm64-apple-macosx/debug/CodexBar.build/CodexBarApp.swift.o","/Users/apple/Downloads/dev1/CodexBar/.build/arm64-apple-macosx/debug/CodexBar.build/StateWatcher.swift.o","/Users/apple/Downloads/dev1/CodexBar/.build/arm64-apple-macosx/debug/CodexBar.build/StatusBarController.swift.o","/Users/apple/Downloads/dev1/CodexBar/.build/arm64-apple-macosx/debug/CodexBar.build/StatusDotView.swift.o","/Users/apple/Downloads/dev1/CodexBar/.build/arm64-apple-macosx/debug/CodexBar.build/StatusModels.swift.o","/Users/apple/Downloads/dev1/CodexBar/.build/arm64-apple-macosx/debug/Modules/CodexBar.swiftmodule"]
+    outputs: ["<CodexBar-arm64-apple-macosx-debug.module>"]
+
+  "C.CodexBar-arm64-apple-macosx-debug.exe":
+    tool: shell
+    inputs: ["/Users/apple/Downloads/dev1/CodexBar/.build/arm64-apple-macosx/debug/CodexBar.build/CodexBarApp.swift.o","/Users/apple/Downloads/dev1/CodexBar/.build/arm64-apple-macosx/debug/CodexBar.build/StateWatcher.swift.o","/Users/apple/Downloads/dev1/CodexBar/.build/arm64-apple-macosx/debug/CodexBar.build/StatusBarController.swift.o","/Users/apple/Downloads/dev1/CodexBar/.build/arm64-apple-macosx/debug/CodexBar.build/StatusDotView.swift.o","/Users/apple/Downloads/dev1/CodexBar/.build/arm64-apple-macosx/debug/CodexBar.build/StatusModels.swift.o","/Users/apple/Downloads/dev1/CodexBar/.build/arm64-apple-macosx/debug/CodexBar.product/Objects.LinkFileList"]
+    outputs: ["/Users/apple/Downloads/dev1/CodexBar/.build/arm64-apple-macosx/debug/CodexBar"]
+    description: "Linking ./.build/arm64-apple-macosx/debug/CodexBar"
+    args: ["/Library/Developer/CommandLineTools/usr/bin/swiftc","-L","/Users/apple/Downloads/dev1/CodexBar/.build/arm64-apple-macosx/debug","-o","/Users/apple/Downloads/dev1/CodexBar/.build/arm64-apple-macosx/debug/CodexBar","-module-name","CodexBar","-Xlinker","-no_warn_duplicate_libraries","-emit-executable","-Xlinker","-alias","-Xlinker","_CodexBar_main","-Xlinker","_main","-Xlinker","-rpath","-Xlinker","@loader_path","@/Users/apple/Downloads/dev1/CodexBar/.build/arm64-apple-macosx/debug/CodexBar.product/Objects.LinkFileList","-Xlinker","-rpath","-Xlinker","/Library/Developer/CommandLineTools/usr/lib/swift-6.2/macosx","-target","arm64-apple-macosx13.0","-Xlinker","-add_ast_path","-Xlinker","/Users/apple/Downloads/dev1/CodexBar/.build/arm64-apple-macosx/debug/Modules/CodexBar.swiftmodule","-I","/Library/Developer/CommandLineTools/Library/Developer/Frameworks","-L","/Library/Developer/CommandLineTools/Library/Developer/Frameworks","-plugin-path","/Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing","-sdk","/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk","-g"]
+
+  "C.CodexBar-arm64-apple-macosx-debug.exe-entitlements":
+    tool: shell
+    inputs: ["/Users/apple/Downloads/dev1/CodexBar/.build/arm64-apple-macosx/debug/CodexBar","/Users/apple/Downloads/dev1/CodexBar/.build/arm64-apple-macosx/debug/CodexBar-entitlement.plist"]
+    outputs: ["<CodexBar-arm64-apple-macosx-debug.exe-CodeSigning>"]
+    description: "Applying debug entitlements to ./.build/arm64-apple-macosx/debug/CodexBar"
+    args: ["codesign","--force","--sign","-","--entitlements","/Users/apple/Downloads/dev1/CodexBar/.build/arm64-apple-macosx/debug/CodexBar-entitlement.plist","/Users/apple/Downloads/dev1/CodexBar/.build/arm64-apple-macosx/debug/CodexBar"]
+
+  "C.CodexBar-arm64-apple-macosx-debug.module":
+    tool: shell
+    inputs: ["/Users/apple/Downloads/dev1/CodexBar/Sources/CodexBar/CodexBarApp.swift","/Users/apple/Downloads/dev1/CodexBar/Sources/CodexBar/StateWatcher.swift","/Users/apple/Downloads/dev1/CodexBar/Sources/CodexBar/StatusBarController.swift","/Users/apple/Downloads/dev1/CodexBar/Sources/CodexBar/StatusDotView.swift","/Users/apple/Downloads/dev1/CodexBar/Sources/CodexBar/StatusModels.swift","/Users/apple/Downloads/dev1/CodexBar/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt","/Users/apple/Downloads/dev1/CodexBar/.build/arm64-apple-macosx/debug/CodexBar.build/sources"]
+    outputs: ["/Users/apple/Downloads/dev1/CodexBar/.build/arm64-apple-macosx/debug/CodexBar.build/CodexBarApp.swift.o","/Users/apple/Downloads/dev1/CodexBar/.build/arm64-apple-macosx/debug/CodexBar.build/StateWatcher.swift.o","/Users/apple/Downloads/dev1/CodexBar/.build/arm64-apple-macosx/debug/CodexBar.build/StatusBarController.swift.o","/Users/apple/Downloads/dev1/CodexBar/.build/arm64-apple-macosx/debug/CodexBar.build/StatusDotView.swift.o","/Users/apple/Downloads/dev1/CodexBar/.build/arm64-apple-macosx/debug/CodexBar.build/StatusModels.swift.o","/Users/apple/Downloads/dev1/CodexBar/.build/arm64-apple-macosx/debug/Modules/CodexBar.swiftmodule"]
+    description: "Compiling Swift Module 'CodexBar' (5 sources)"
+    args: ["/Library/Developer/CommandLineTools/usr/bin/swiftc","-module-name","CodexBar","-emit-dependencies","-emit-module","-emit-module-path","/Users/apple/Downloads/dev1/CodexBar/.build/arm64-apple-macosx/debug/Modules/CodexBar.swiftmodule","-output-file-map","/Users/apple/Downloads/dev1/CodexBar/.build/arm64-apple-macosx/debug/CodexBar.build/output-file-map.json","-incremental","-c","@/Users/apple/Downloads/dev1/CodexBar/.build/arm64-apple-macosx/debug/CodexBar.build/sources","-I","/Users/apple/Downloads/dev1/CodexBar/.build/arm64-apple-macosx/debug/Modules","-target","arm64-apple-macosx13.0","-incremental","-enable-batch-mode","-serialize-diagnostics","-index-store-path","/Users/apple/Downloads/dev1/CodexBar/.build/arm64-apple-macosx/debug/index/store","-Onone","-enable-testing","-j12","-DSWIFT_PACKAGE","-DDEBUG","-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE","-module-cache-path","/Users/apple/Downloads/dev1/CodexBar/.build/arm64-apple-macosx/debug/ModuleCache","-parseable-output","-Xfrontend","-entry-point-function-name","-Xfrontend","CodexBar_main","-swift-version","5","-I","/Library/Developer/CommandLineTools/Library/Developer/Frameworks","-L","/Library/Developer/CommandLineTools/Library/Developer/Frameworks","-plugin-path","/Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing","-sdk","/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk","-g","-Xcc","-isysroot","-Xcc","/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk","-Xcc","-fPIC","-Xcc","-g","-package-name","codexbar"]
+
+  "PackageStructure":
+    tool: package-structure-tool
+    inputs: ["/Users/apple/Downloads/dev1/CodexBar/Sources/CodexBar/","/Users/apple/Downloads/dev1/CodexBar/Package.swift","/Users/apple/Downloads/dev1/CodexBar/Package.resolved"]
+    outputs: ["<PackageStructure>"]
+    description: "Planning build"
+    allow-missing-inputs: true
+
