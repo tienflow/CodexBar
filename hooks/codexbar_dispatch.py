@@ -28,6 +28,9 @@ USER_INTERACTION_TOOLS = {
 
 TOOL_EVENTS = {"PreToolUse", "PostToolUse"}
 
+# Events that don't require an active session (idle/completed are always safe)
+ACTIVE_SESSION_GATED = {"PreToolUse", "PermissionRequest", "SubagentStart"}
+
 
 def trace(msg: str) -> None:
     try:
@@ -101,19 +104,40 @@ def main():
     # Log ALL events with full detail
     trace(f"HOOK={event_name} state={new_state} tool={data.get('tool_name','')} mode={data.get('permission_mode','')}")
 
+    status = read_existing_status()
+
+    # -- Session lifecycle tracking --
+    active_session = status.get("active_session", False)
+
+    if event_name == "SessionStart":
+        # Fresh session — not active until user submits a prompt
+        active_session = False
+    elif event_name == "UserPromptSubmit":
+        # User explicitly submits a prompt -> session is active
+        active_session = True
+    elif event_name == "Stop":
+        # Task done — session ends
+        active_session = False
+
+    status["active_session"] = active_session
+
+    # -- Gate active states behind session --
+    # If there's no active session, suppress tool/subagent-based state changes
+    if event_name in ACTIVE_SESSION_GATED and not active_session:
+        trace(f"BACKGROUND: {event_name} suppressed (no active session)")
+        new_state = None
+
     # For PreToolUse, check if tool requires user interaction
-    if event_name == "PreToolUse":
+    if event_name == "PreToolUse" and new_state is not None:
         tool_name = data.get("tool_name", "")
         if tool_name in USER_INTERACTION_TOOLS:
             new_state = "confirming"
             trace(f"USER_INTERACTION: {tool_name} -> confirming")
 
-    # For PermissionRequest, always confirming
-    if event_name == "PermissionRequest":
+    # For PermissionRequest, always confirming (if session is active)
+    if event_name == "PermissionRequest" and new_state is not None:
         new_state = "confirming"
         trace(f"PERMISSION_REQUEST -> confirming")
-
-    status = read_existing_status()
 
     tz = timezone(timedelta(hours=8))
     status["timestamp"] = datetime.now(tz).isoformat()

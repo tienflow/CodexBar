@@ -130,5 +130,113 @@ class TestReadExistingStatus(unittest.TestCase):
         self.assertEqual(loaded, {})
 
 
+class TestActiveSessionLifecycle(unittest.TestCase):
+    """Tests for the active_session gating logic in main()."""
+
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+        self.test_status_path = os.path.join(self.test_dir, "test-status.json")
+        self.debug_log = os.path.join(self.test_dir, "test-trace.log")
+        # Empty stdin — we'll simulate via JSON payload passed to main()
+        self.stdin_patch = patch.object(sys, 'stdin')
+
+    def _simulate(self, event_name, **extra):
+        """Simulate a hook event by writing to stdin and calling main()."""
+        payload = {"hook_event_name": event_name, **extra}
+        with patch.object(dispatch, "STATUS_PATH", self.test_status_path), \
+             patch.object(dispatch, "DEBUG_LOG", self.debug_log), \
+             patch.object(sys, 'stdin') as mock_stdin:
+            mock_stdin.read.return_value = json.dumps(payload)
+            dispatch.main()
+        with open(self.test_status_path) as f:
+            return json.load(f)
+
+    def test_background_pretooluse_suppressed(self):
+        """PreToolUse without active_session should not change state."""
+        status = self._simulate("SessionStart")
+        self.assertEqual(status["state"], "idle")
+        self.assertFalse(status["active_session"])
+
+        status = self._simulate("PreToolUse", tool_name="Bash")
+        self.assertEqual(status["state"], "idle")
+        self.assertFalse(status["active_session"])
+
+    def test_userprompt_starts_session(self):
+        """UserPromptSubmit sets active_session and allows developing state."""
+        self._simulate("SessionStart")
+        status = self._simulate("UserPromptSubmit", session_id="s1")
+        self.assertEqual(status["state"], "thinking")
+        self.assertTrue(status["active_session"])
+
+        status = self._simulate("PreToolUse", tool_name="apply_patch", session_id="s1")
+        self.assertEqual(status["state"], "developing")
+        self.assertTrue(status["active_session"])
+
+    def test_stop_ends_session(self):
+        """Stop clears active_session and suppresses subsequent background events."""
+        self._simulate("SessionStart")
+        self._simulate("UserPromptSubmit", session_id="s1")
+        self._simulate("PreToolUse", tool_name="Bash", session_id="s1")
+
+        status = self._simulate("Stop", session_id="s1")
+        self.assertEqual(status["state"], "completed")
+        self.assertFalse(status["active_session"])
+
+        # Background tool use after Stop — should NOT change state
+        status = self._simulate("PreToolUse", tool_name="Bash")
+        self.assertEqual(status["state"], "completed")
+        self.assertFalse(status["active_session"])
+
+    def test_subagent_start_gated(self):
+        """SubagentStart only triggers thinking if session is active."""
+        self._simulate("SessionStart")
+
+        # Background SubagentStart — should be suppressed
+        status = self._simulate("SubagentStart")
+        self.assertEqual(status["state"], "idle")
+        self.assertFalse(status["active_session"])
+
+        # Now with active session
+        self._simulate("UserPromptSubmit", session_id="s1")
+        status = self._simulate("SubagentStart", session_id="s1")
+        self.assertEqual(status["state"], "thinking")
+        self.assertTrue(status["active_session"])
+
+    def test_permission_request_gated(self):
+        """PermissionRequest only sets confirming if session is active."""
+        # Background PermissionRequest — suppressed
+        self._simulate("SessionStart")
+        status = self._simulate("PermissionRequest")
+        self.assertEqual(status["state"], "idle")
+
+        # With active session
+        self._simulate("UserPromptSubmit", session_id="s1")
+        status = self._simulate("PermissionRequest")
+        self.assertEqual(status["state"], "confirming")
+
+    def test_user_interaction_tool_during_session(self):
+        """PreToolUse with user interaction tool maps to confirming."""
+        self._simulate("SessionStart")
+        self._simulate("UserPromptSubmit", session_id="s1")
+
+        status = self._simulate("PreToolUse", tool_name="request_user_input", session_id="s1")
+        self.assertEqual(status["state"], "confirming")
+
+    def test_second_task_after_stop(self):
+        """New UserPromptSubmit after Stop starts a fresh active session."""
+        self._simulate("SessionStart")
+        self._simulate("UserPromptSubmit", session_id="s1")
+        self._simulate("PreToolUse", tool_name="Bash", session_id="s1")
+        self._simulate("Stop", session_id="s1")
+
+        # New task
+        status = self._simulate("UserPromptSubmit", session_id="s2")
+        self.assertTrue(status["active_session"])
+        self.assertEqual(status["state"], "thinking")
+
+        status = self._simulate("PreToolUse", tool_name="apply_patch", session_id="s2")
+        self.assertEqual(status["state"], "developing")
+
+
 if __name__ == "__main__":
     unittest.main()
