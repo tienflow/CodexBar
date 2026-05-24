@@ -1,10 +1,6 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-"""CodexBar hook dispatcher.
-
-Reads Codex hook JSON from stdin, maps events to agent states,
-and atomically writes ~/.codex/agent-status.json for the Swift menu bar app.
-"""
+"""CodexBar hook dispatcher."""
 import json
 import os
 import sys
@@ -15,7 +11,6 @@ from datetime import datetime, timezone, timedelta
 STATUS_PATH = os.path.expanduser("~/.codex/agent-status.json")
 DEBUG_LOG = os.path.expanduser("~/.codex/hooks/codexbar_tool_trace.log")
 
-# Event -> state mapping. None means "don't change state, only update metadata".
 EVENT_STATE_MAP = {
     "SessionStart":       "idle",
     "UserPromptSubmit":   "thinking",
@@ -26,18 +21,15 @@ EVENT_STATE_MAP = {
     "Stop":               "completed",
 }
 
-# Tool names that require user interaction -> confirming state
 USER_INTERACTION_TOOLS = {
     "request_user_input",
     "AskUser",
 }
 
-# Events that carry tool information
 TOOL_EVENTS = {"PreToolUse", "PostToolUse"}
 
 
 def trace(msg: str) -> None:
-    """Append a line to the trace log for debugging."""
     try:
         ts = datetime.now().strftime("%H:%M:%S.%f")[:-3]
         with open(DEBUG_LOG, "a") as f:
@@ -47,11 +39,9 @@ def trace(msg: str) -> None:
 
 
 def extract_tool_detail(event_name: str, data: dict) -> tuple[str | None, str | None]:
-    """Extract tool name and human-readable detail from hook data."""
     tool_name = data.get("tool_name")
     tool_input = data.get("tool_input") or {}
 
-    # Log every tool name we see
     if tool_name:
         trace(f"EVENT={event_name} TOOL={tool_name}")
 
@@ -72,7 +62,6 @@ def extract_tool_detail(event_name: str, data: dict) -> tuple[str | None, str | 
 
 
 def read_existing_status() -> dict:
-    """Read existing status file, returning empty dict on failure."""
     try:
         with open(STATUS_PATH, "r") as f:
             return json.load(f)
@@ -81,7 +70,6 @@ def read_existing_status() -> dict:
 
 
 def write_status_atomic(status: dict) -> None:
-    """Write status file atomically using temp file + rename + flock."""
     dir_name = os.path.dirname(STATUS_PATH) or "."
     fd, tmp_path = tempfile.mkstemp(dir=dir_name, suffix=".tmp")
     try:
@@ -110,21 +98,26 @@ def main():
     event_name = data.get("hook_event_name", "")
     new_state = EVENT_STATE_MAP.get(event_name)
 
+    # Log ALL events with full detail
+    trace(f"HOOK={event_name} state={new_state} tool={data.get('tool_name','')} mode={data.get('permission_mode','')}")
+
     # For PreToolUse, check if tool requires user interaction
     if event_name == "PreToolUse":
         tool_name = data.get("tool_name", "")
         if tool_name in USER_INTERACTION_TOOLS:
             new_state = "confirming"
-            trace(f"USER_INTERACTION detected: {tool_name} -> confirming")
+            trace(f"USER_INTERACTION: {tool_name} -> confirming")
 
-    # Load existing status and update
+    # For PermissionRequest, always confirming
+    if event_name == "PermissionRequest":
+        new_state = "confirming"
+        trace(f"PERMISSION_REQUEST -> confirming")
+
     status = read_existing_status()
 
-    # Always update timestamp
     tz = timezone(timedelta(hours=8))
     status["timestamp"] = datetime.now(tz).isoformat()
 
-    # Update session/turn context
     if sid := data.get("session_id"):
         status["session_id"] = sid
     if tid := data.get("turn_id"):
@@ -134,11 +127,10 @@ def main():
     if model := data.get("model"):
         status["model"] = model
 
-    # Update state if this event maps to one
     if new_state is not None:
         status["state"] = new_state
+        trace(f"STATE -> {new_state}")
 
-    # Update tool info from tool-bearing events
     if event_name in TOOL_EVENTS:
         tool, detail = extract_tool_detail(event_name, data)
         if tool:
@@ -146,7 +138,6 @@ def main():
         if detail:
             status["last_tool_detail"] = detail
 
-    # For SessionStart, reset to idle and clear tool info
     if event_name == "SessionStart":
         status.pop("last_tool", None)
         status.pop("last_tool_detail", None)

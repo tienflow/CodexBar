@@ -1,53 +1,43 @@
 import AppKit
 
-/// Custom NSView that draws a colored dot with optional breathing/blink animation.
-final class StatusDotView: NSView {
+/// Three traffic lights inside a white-bordered transparent pill.
+/// Running state shows marquee between yellow and green only.
+final class PillStatusView: NSView {
     private var currentState: AgentState = .idle
-    private var displayLink: CVDisplayLink?
-    private var animationStartTime: CFTimeInterval = 0
-    private var blinkTimer: Timer?
+    private var animTimer: Timer?
+    private var animPhase: CGFloat = 0
     private var isBlinkVisible = true
 
-    private let dotRadius: CGFloat = 4
-    private let viewSize: CGFloat = 18
+    private let yellowColor = NSColor(red: 1.0, green: 0.76, blue: 0.03, alpha: 1.0)
+    private let greenColor = NSColor(red: 0.20, green: 0.82, blue: 0.35, alpha: 1.0)
+    private let redColor = NSColor(red: 1.0, green: 0.22, blue: 0.17, alpha: 1.0)
 
-    private static let colors: [AgentState: NSColor] = [
-        .idle:       NSColor(red: 0.4, green: 0.4, blue: 0.4, alpha: 1.0),
-        .thinking:   NSColor(red: 0.96, green: 0.65, blue: 0.14, alpha: 1.0),
-        .developing: NSColor(red: 0.30, green: 0.85, blue: 0.39, alpha: 1.0),
-        .confirming: NSColor(red: 1.0, green: 0.23, blue: 0.19, alpha: 1.0),
-        .completed:  NSColor(red: 0.30, green: 0.85, blue: 0.39, alpha: 1.0),
-    ]
+    private let pillWidth: CGFloat = 50
+    private let pillHeight: CGFloat = 18
+    private let dotRadius: CGFloat = 5.0
+    private let borderWidth: CGFloat = 1.2
 
     init() {
-        super.init(frame: NSRect(x: 0, y: 0, width: viewSize, height: viewSize))
+        super.init(frame: NSRect(x: 0, y: 0, width: 50, height: 18))
     }
 
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
+    required init?(coder: NSCoder) { fatalError() }
 
-    deinit {
-        stopAllAnimations()
-    }
+    deinit { stopAnim() }
 
     func update(state: AgentState) {
         let prev = currentState
         currentState = state
-
         guard prev != state else { return }
-
-        stopAllAnimations()
-
+        stopAnim()
         switch state {
         case .thinking, .developing:
-            startBreathing(period: state.pulsePeriod)
+            startAnim()
         case .confirming:
-            startBlinking()
+            startBlink()
         default:
             break
         }
-
         needsDisplay = true
     }
 
@@ -57,65 +47,84 @@ final class StatusDotView: NSView {
         guard let ctx = NSGraphicsContext.current?.cgContext else { return }
         ctx.saveGState()
 
-        let center = CGPoint(x: bounds.midX, y: bounds.midY)
-        let color = Self.colors[currentState] ?? Self.colors[.idle]!
+        let centerY = pillHeight / 2
+        let spacing: CGFloat = 13
+        let startX = (pillWidth - spacing * 2) / 2
 
-        var alpha: CGFloat = 1.0
-        if currentState == .confirming {
-            alpha = isBlinkVisible ? 1.0 : 0.0
-        }
+        // Capsule shape
+        let pillRect = NSRect(x: 0, y: 0, width: pillWidth, height: pillHeight)
+        let pillPath = NSBezierPath(roundedRect: pillRect, xRadius: pillHeight / 2, yRadius: pillHeight / 2)
+        NSColor.clear.setFill()
+        pillPath.fill()
+        pillPath.lineWidth = borderWidth
+        NSColor.white.setStroke()
+        pillPath.stroke()
 
-        ctx.setFillColor(color.withAlphaComponent(alpha).cgColor)
-        ctx.fillEllipse(in: CGRect(
-            x: center.x - dotRadius,
-            y: center.y - dotRadius,
-            width: dotRadius * 2,
-            height: dotRadius * 2
-        ))
+        let (ya, ga, ra) = lightAlphas()
+
+        // Yellow (left)
+        ctx.setFillColor(yellowColor.withAlphaComponent(ya).cgColor)
+        ctx.fillEllipse(in: NSRect(x: startX - dotRadius, y: centerY - dotRadius,
+                                   width: dotRadius * 2, height: dotRadius * 2))
+
+        // Green (center)
+        ctx.setFillColor(greenColor.withAlphaComponent(ga).cgColor)
+        ctx.fillEllipse(in: NSRect(x: startX + spacing - dotRadius, y: centerY - dotRadius,
+                                   width: dotRadius * 2, height: dotRadius * 2))
+
+        // Red (right)
+        ctx.setFillColor(redColor.withAlphaComponent(ra).cgColor)
+        ctx.fillEllipse(in: NSRect(x: startX + spacing * 2 - dotRadius, y: centerY - dotRadius,
+                                   width: dotRadius * 2, height: dotRadius * 2))
 
         ctx.restoreGState()
     }
 
-    // MARK: - Breathing Animation
+    private func lightAlphas() -> (CGFloat, CGFloat, CGFloat) {
+        let dim: CGFloat = 0.15
+        switch currentState {
+        case .idle:
+            return (dim, dim, dim)
 
-    private func startBreathing(period: Double) {
-        animationStartTime = CACurrentMediaTime()
+        case .thinking, .developing:
+            // Marquee between yellow and green only
+            // phase 0..1: yellow bright, green dim
+            // phase 1..2: yellow dim, green bright
+            let p = animPhase.truncatingRemainder(dividingBy: 2.0)
+            let yAlpha: CGFloat = (p < 1.0) ? 1.0 : dim
+            let gAlpha: CGFloat = (p >= 1.0) ? 1.0 : dim
+            return (yAlpha, gAlpha, dim)
 
-        var displayLinkRef: CVDisplayLink?
-        CVDisplayLinkCreateWithActiveCGDisplays(&displayLinkRef)
-        guard let link = displayLinkRef else { return }
+        case .confirming:
+            // Red blink
+            let r = isBlinkVisible ? 1.0 : 0.08
+            return (dim, dim, r)
 
-        let linkSelf = Unmanaged.passUnretained(self).toOpaque()
-        CVDisplayLinkSetOutputCallback(link, { _, _, _, _, _, userInfo -> CVReturn in
-            guard let info = userInfo else { return kCVReturnSuccess }
-            let view = Unmanaged<StatusDotView>.fromOpaque(info).takeUnretainedValue()
-            DispatchQueue.main.async {
-                view.needsDisplay = true
-            }
-            return kCVReturnSuccess
-        }, linkSelf)
-
-        CVDisplayLinkStart(link)
-        displayLink = link
-    }
-
-    private func stopAllAnimations() {
-        if let link = displayLink {
-            CVDisplayLinkStop(link)
-            CVDisplayLinkSetOutputCallback(link, nil, nil)
-            displayLink = nil
+        case .completed:
+            // Green solid
+            return (dim, 1.0, dim)
         }
-        blinkTimer?.invalidate()
-        blinkTimer = nil
     }
 
-    // MARK: - Blink Animation
+    private func startAnim() {
+        animTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 15.0, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            self.animPhase += 0.10
+            self.needsDisplay = true
+        }
+    }
 
-    private func startBlinking() {
-        blinkTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+    private func startBlink() {
+        animTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
             guard let self else { return }
             self.isBlinkVisible.toggle()
             self.needsDisplay = true
         }
+    }
+
+    private func stopAnim() {
+        animTimer?.invalidate()
+        animTimer = nil
+        animPhase = 0
     }
 }
