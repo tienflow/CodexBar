@@ -30,7 +30,9 @@ final class PillStatusView: NSView {
         guard prev != state else { return }
         stopAnim()
         switch state {
-        case .thinking, .developing:
+        case .thinking:
+            startBreathing()
+        case .developing:
             startMarquee()
         case .confirming:
             startBlink()
@@ -80,17 +82,36 @@ final class PillStatusView: NSView {
         switch currentState {
         case .idle:
             return (dim, dim, dim)
-        case .thinking, .developing:
+
+        case .thinking:
+            // Yellow breathing pulse only
+            let yAlpha = 0.3 + 0.7 * abs(sin(animPhase))
+            return (yAlpha, dim, dim)
+
+        case .developing:
+            // Yellow-green marquee
             let p = animPhase.truncatingRemainder(dividingBy: 2.0)
             let yAlpha: CGFloat = (p < 1.0) ? 1.0 : dim
             let gAlpha: CGFloat = (p >= 1.0) ? 1.0 : dim
             return (yAlpha, gAlpha, dim)
+
         case .confirming:
             let r = isBlinkVisible ? 1.0 : 0.08
             return (dim, dim, r)
+
         case .completed:
             return (dim, 1.0, dim)
         }
+    }
+
+    private func startBreathing() {
+        let timer = Timer(timeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            self.animPhase += 0.10
+            self.needsDisplay = true
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        animTimer = timer
     }
 
     private func startMarquee() {
