@@ -65,8 +65,8 @@ class TestEventStateMap(unittest.TestCase):
     def test_permission_request(self):
         self.assertEqual(dispatch.EVENT_STATE_MAP["PermissionRequest"], "confirming")
 
-    def test_post_tool_use_no_state(self):
-        self.assertIsNone(dispatch.EVENT_STATE_MAP["PostToolUse"])
+    def test_post_tool_use_returns_thinking(self):
+        self.assertEqual(dispatch.EVENT_STATE_MAP["PostToolUse"], "thinking")
 
     def test_stop(self):
         self.assertEqual(dispatch.EVENT_STATE_MAP["Stop"], "completed")
@@ -137,8 +137,6 @@ class TestActiveSessionLifecycle(unittest.TestCase):
         self.test_dir = tempfile.mkdtemp()
         self.test_status_path = os.path.join(self.test_dir, "test-status.json")
         self.debug_log = os.path.join(self.test_dir, "test-trace.log")
-        # Empty stdin — we'll simulate via JSON payload passed to main()
-        self.stdin_patch = patch.object(sys, 'stdin')
 
     def _simulate(self, event_name, **extra):
         """Simulate a hook event by writing to stdin and calling main()."""
@@ -161,6 +159,13 @@ class TestActiveSessionLifecycle(unittest.TestCase):
         self.assertEqual(status["state"], "idle")
         self.assertFalse(status["active_session"])
 
+    def test_background_posttooluse_suppressed(self):
+        """PostToolUse without active_session should not change state."""
+        self._simulate("SessionStart")
+        status = self._simulate("PostToolUse", tool_name="Bash")
+        self.assertEqual(status["state"], "idle")
+        self.assertFalse(status["active_session"])
+
     def test_userprompt_starts_session(self):
         """UserPromptSubmit sets active_session and allows developing state."""
         self._simulate("SessionStart")
@@ -170,6 +175,16 @@ class TestActiveSessionLifecycle(unittest.TestCase):
 
         status = self._simulate("PreToolUse", tool_name="apply_patch", session_id="s1")
         self.assertEqual(status["state"], "developing")
+        self.assertTrue(status["active_session"])
+
+    def test_posttooluse_reverts_to_thinking(self):
+        """PostToolUse during active session reverts state to thinking."""
+        self._simulate("SessionStart")
+        self._simulate("UserPromptSubmit", session_id="s1")
+        self._simulate("PreToolUse", tool_name="Bash", session_id="s1")
+
+        status = self._simulate("PostToolUse", tool_name="Bash", session_id="s1")
+        self.assertEqual(status["state"], "thinking")
         self.assertTrue(status["active_session"])
 
     def test_stop_ends_session(self):
@@ -236,6 +251,27 @@ class TestActiveSessionLifecycle(unittest.TestCase):
 
         status = self._simulate("PreToolUse", tool_name="apply_patch", session_id="s2")
         self.assertEqual(status["state"], "developing")
+
+    def test_full_tool_cycle(self):
+        """Full PreToolUse -> PostToolUse cycle reverts to thinking."""
+        self._simulate("SessionStart")
+        self._simulate("UserPromptSubmit", session_id="s1")
+
+        # Tool starts
+        status = self._simulate("PreToolUse", tool_name="Bash", session_id="s1")
+        self.assertEqual(status["state"], "developing")
+
+        # Tool finishes
+        status = self._simulate("PostToolUse", tool_name="Bash", session_id="s1")
+        self.assertEqual(status["state"], "thinking")
+
+        # Another tool
+        status = self._simulate("PreToolUse", tool_name="apply_patch", session_id="s1")
+        self.assertEqual(status["state"], "developing")
+
+        # Second tool finishes
+        status = self._simulate("PostToolUse", tool_name="apply_patch", session_id="s1")
+        self.assertEqual(status["state"], "thinking")
 
 
 if __name__ == "__main__":

@@ -16,8 +16,8 @@ EVENT_STATE_MAP = {
     "UserPromptSubmit":   "thinking",
     "SubagentStart":      "thinking",
     "PreToolUse":         "developing",
+    "PostToolUse":        "thinking",
     "PermissionRequest":  "confirming",
-    "PostToolUse":        None,
     "Stop":               "completed",
 }
 
@@ -29,7 +29,7 @@ USER_INTERACTION_TOOLS = {
 TOOL_EVENTS = {"PreToolUse", "PostToolUse"}
 
 # Events that don't require an active session (idle/completed are always safe)
-ACTIVE_SESSION_GATED = {"PreToolUse", "PermissionRequest", "SubagentStart"}
+ACTIVE_SESSION_GATED = {"PreToolUse", "PostToolUse", "PermissionRequest", "SubagentStart"}
 
 
 def trace(msg: str) -> None:
